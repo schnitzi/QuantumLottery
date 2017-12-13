@@ -17,31 +17,33 @@ object QuantumLottery {
     private val FORMAT = NumberFormat.getIntegerInstance()
 
     @Throws(IOException::class)
-    private fun generateLotteryNumbers(balls: Int, max: Int) {
-        val combinations = getHowManyCombinations(balls, max)
-        println("For $balls balls numbered 1 to $max, there are ${FORMAT.format(combinations)} possible combinations.")
+    private fun generateLotteryNumbers(ballCount: Int, max: Int) {
+        val combinations = getHowManyCombinations(ballCount, max)
+        println("For $ballCount balls numbered 1 to $max, there are ${FORMAT.format(combinations)} possible combinations.")
 
         val bitsNeeded = getBitsNeeded(combinations)
         println("To generate a random number in that range requires $bitsNeeded bits.")
 
         val randomNumberMax = getRandomNumberMax(bitsNeeded)
-        println("This will give us a random number in the range 1 to ${FORMAT.format(randomNumberMax)}.")
 
         if (randomNumberMax > combinations) {
-            println("That's a bit too big so ${FORMAT.format(randomNumberMax - combinations)} numbers will map to the same combination.")
+            println("But $bitsNeeded bits will actually give us ${FORMAT.format(randomNumberMax)} possible combinations.")
+            println("That's more than the ${FORMAT.format(combinations)} we need so ${FORMAT.format(randomNumberMax - combinations)} combinations will have to map to more than one number.")
+        } else {
+            println("That many bits will give us exactly the ${FORMAT.format(randomNumberMax)} possible combinations we need.")
         }
 
         val bytesNeeded = getBytesNeeded(bitsNeeded)
-        println("QRNG generates random bytes, not bits, so we'll need at least $bytesNeeded bytes.")
+        println("QRNG generates random bytes, not bits, so to get $bitsNeeded bits, we'll need to ask for at least $bytesNeeded bytes.")
 
         val randomBytes: MutableList<Byte> = getRandomBytes(bytesNeeded)
-        println("The random bytes we got from the QRNG are $randomBytes.")
+        println("The $bytesNeeded random bytes we got from the QRNG are $randomBytes.")
 
         val randomBits = getRandomBits(randomBytes)
         println("These bytes convert to these random bits: $randomBits.")
 
-        val truncatedRandomBits = randomBits.substring(0..bitsNeeded-1)
-        println("Truncating to the minimum number of bits we need gives us $truncatedRandomBits.")
+        val truncatedRandomBits = randomBits.substring(0 until bitsNeeded)
+        println("Truncating to the $bitsNeeded bits we need gives us $truncatedRandomBits.")
 
         var randomNumber = BigInteger(truncatedRandomBits, 2)
         println("Converted back into an integer, that's ${FORMAT.format(randomNumber)}.")
@@ -51,13 +53,11 @@ object QuantumLottery {
             println("Since this is too large, we mod it by ${FORMAT.format(combinations)} to get ${FORMAT.format(randomNumber)}.")
         }
 
-        val lotteryNumbers = getLotteryNumbers(balls, randomNumber)
-        println("The corresponding lottery numbers for ${FORMAT.format(randomNumber)} are $lotteryNumbers")
+        val lotteryNumbers = getLotteryNumbers(ballCount, randomNumber)
+        println("The corresponding lottery numbers for index ${FORMAT.format(randomNumber)} are $lotteryNumbers")
     }
 
-    private fun getRandomBits(randomBytes: MutableList<Byte>): String {
-        return randomBytes.joinToString("") { bitString(it) }
-    }
+    private fun getRandomBits(randomBytes: MutableList<Byte>): String = randomBytes.joinToString("") { bitString(it) }
 
     private fun bitString(byte: Byte): CharSequence {
         val longBitString = "00000000" + BigInteger.valueOf(byte.toLong() and 0xFF).toString(2)
@@ -66,9 +66,7 @@ object QuantumLottery {
 
     private fun getBytesNeeded(bitsNeeded: Int) = (bitsNeeded-1) / 8 + 1
 
-    private fun getRandomNumberMax(bitsNeeded: Int): BigInteger {
-        return BigInteger.valueOf(2).pow(bitsNeeded)
-    }
+    private fun getRandomNumberMax(bitsNeeded: Int): BigInteger = BigInteger.valueOf(2).pow(bitsNeeded)
 
     /**
      *  Determines the set of lottery numbers corresponding to the index which was generated as
@@ -76,11 +74,11 @@ object QuantumLottery {
      *  {@link https://en.wikipedia.org/wiki/Combinatorial_number_system#Finding_the_k-combination_for_a_given_number}
      *  to pick a combination.
      */
-    private fun getLotteryNumbers(balls: Int, randomNumber: BigInteger): MutableList<Int> {
+    private fun getLotteryNumbers(ballCount: Int, index: BigInteger): MutableList<Int> {
         val lotteryNumbers = mutableListOf<Int>()
-        var k = balls
-        var position = randomNumber
-        for (ball in 1..balls) {
+        var k = ballCount
+        var position = index
+        for (ball in 1..ballCount) {
             var i = k-2
             var previousNChooseK: BigInteger
             var nChooseK = BigInteger.ZERO
@@ -120,10 +118,10 @@ object QuantumLottery {
         return bitsNeeded
     }
 
-    private fun getHowManyCombinations(balls: Int, max: Int): BigInteger {
+    private fun getHowManyCombinations(ballCount: Int, max: Int): BigInteger {
         var numerator: Long = 1
         var denominator: Long = 1
-        for (i in 0 until balls) {
+        for (i in 0 until ballCount) {
             numerator *= (max - i).toLong()
             denominator *= (i + 1).toLong()
         }
